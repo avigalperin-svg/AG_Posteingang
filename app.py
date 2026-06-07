@@ -21,7 +21,7 @@ try:
 except ImportError:
     HAVE_PDF = False
 
-PORT = int(os.environ.get('PORT', 8080))
+PORT = int(os.environ.get('PORT', 10000))
 
 # ─── PASSWORTSCHUTZ ──────────────────────────────────────────────────────────
 # Zugangscode für die App (wird in Render als Umgebungsvariable gesetzt)
