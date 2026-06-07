@@ -423,11 +423,12 @@ const now=()=>{const d=new Date();return pad(d.getHours())+':'+pad(d.getMinutes(
 const tod=()=>{const d=new Date();return pad(d.getDate())+'.'+pad(d.getMonth()+1)+'.'+d.getFullYear()};
 const setP=p=>{$('prw').style.display='block';$('prb').style.width=p+'%'};
 const setSP=(id,c)=>{const e=$(id);e.className='sp';if(c)e.classList.add(c)};
-const tog=id=>{const e=$(id);e.style.display=e.style.display==='block'?'none':'block'};
-const sess=()=>localStorage.getItem('sela_session')||'';
-const hdr=()=>({'Content-Type':'application/json','X-Session':sess()});
+const H={'Content-Type':'application/json'};
 
-function logout(){localStorage.removeItem('sela_session');window.location.href='/';}
+function logout(){
+  document.cookie='sela_token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT';
+  window.location.href='/';
+}
 
 function lg(icon,color,text){
   const d=document.createElement('div');d.className='li';
@@ -443,7 +444,7 @@ function showTab(n,btn){
 
 async function loadCfg(){
   try{
-    const r=await fetch('/config',{headers:hdr()});
+    const r=await fetch('/config',{headers:H});
     if(r.status===401){window.location.href='/';return;}
     const c=await r.json();
     if(c.smtp_user)$('c-mu').value=c.smtp_user;
@@ -460,22 +461,22 @@ async function saveCfg(){
     tg_chat_id:$('c-tc').value.trim(), smtp_user:$('c-mu').value.trim(),
     smtp_pass:$('c-mp').value.trim(), sender_name:$('c-mn').value.trim()||'Sela Holding Berlin'
   };
-  const r=await fetch('/config/save',{method:'POST',headers:hdr(),body:JSON.stringify(c)});
+  const r=await fetch('/config/save',{method:'POST',headers:H,body:JSON.stringify(c)});
   const d=await r.json();
   $('cfgmsg').innerHTML=d.ok?'<span class="bdg bok"><i class="ti ti-check"></i> Gespeichert</span>':'<span class="bdg berr">Fehler</span>';
   setTimeout(()=>$('cfgmsg').innerHTML='',3000);
   lg('ti-device-floppy','var(--gr)','Konfiguration gespeichert');
 }
 async function testTG(){
-  const r=await fetch('/telegram/send',{method:'POST',headers:hdr(),body:JSON.stringify({text:'✅ Telegram-Test OK – Sela Holding Posteingang bereit!'})});
+  const r=await fetch('/telegram/send',{method:'POST',headers:H,body:JSON.stringify({text:'✅ Telegram-Test OK – Sela Holding Posteingang bereit!'})});
   const d=await r.json();
   $('cfgmsg').innerHTML=d.ok?'<span class="bdg bok"><i class="ti ti-check"></i> Telegram OK!</span>':'<span class="bdg berr">'+d.error+'</span>';
   setTimeout(()=>$('cfgmsg').innerHTML='',4000);
 }
 async function testMail(){
   $('cfgmsg').innerHTML='<span class="bdg binfo"><i class="ti ti-loader"></i> Sende...</span>';
-  const c=await(await fetch('/config',{headers:hdr()})).json();
-  const r=await fetch('/email/send',{method:'POST',headers:hdr(),
+  const c=await(await fetch('/config',{headers:H})).json();
+  const r=await fetch('/email/send',{method:'POST',headers:H,
     body:JSON.stringify({to:c.smtp_user||$('c-mu').value,subject:'Test – Sela Holding Posteingang',body:'Verbindungstest erfolgreich.'})});
   const d=await r.json();
   $('cfgmsg').innerHTML=d.ok?'<span class="bdg bok"><i class="ti ti-check"></i> Test-Mail gesendet!</span>':'<span class="bdg berr">'+d.error+'</span>';
@@ -512,7 +513,7 @@ async function runAll(){
 
     // 1. STEMPEL via Server
     lg('ti-stamp','var(--ac)','Stempel wird gesetzt...');
-    const sr=await fetch('/stamp',{method:'POST',headers:hdr(),
+    const sr=await fetch('/stamp',{method:'POST',headers:H,
       body:JSON.stringify({pdf_b64:rawB64,mime:f.type,nr})});
     if(sr.status===401){window.location.href='/';return}
     const sd=await sr.json();
@@ -538,7 +539,7 @@ async function runAll(){
 
     // 2. KI-ANALYSE
     lg('ti-cpu','var(--ac)','KI-Analyse...');setSP('sp2','run');
-    const cfg=await(await fetch('/config',{headers:hdr()})).json();
+    const cfg=await(await fetch('/config',{headers:H})).json();
     if(!cfg.api_key&&!cfg.api_key_set)throw new Error('API-Key fehlt – bitte in Konfiguration eintragen!');
     const mc=[];
     if(f.type.startsWith('image/'))mc.push({type:'image',source:{type:'base64',media_type:f.type,data:rawB64}});
@@ -562,7 +563,7 @@ async function runAll(){
     lg('ti-brand-telegram','var(--ac)','Sende Telegram...');setSP('sp3','run');
     const tgTxt=`📬 <b>POSTEINGANG – Sela Holding</b>\n━━━━━━━━━━━━━━━━━━━━\n<b>Nr.:</b>      ${nr}\n<b>Eingang:</b> ${datum} · ${uhrzeit} Uhr\n<b>Datei:</b>   ${f.name}\n━━━━━━━━━━━━━━━━━━━━\n${analysis}\n━━━━━━━━━━━━━━━━━━━━\n<b>Bitte Entscheidung in der App treffen!</b>`;
     $('tgp').style.display='block';$('tgp').textContent=tgTxt.replace(/<[^>]+>/g,'');
-    const tr=await fetch('/telegram/send',{method:'POST',headers:hdr(),body:JSON.stringify({text:tgTxt})});
+    const tr=await fetch('/telegram/send',{method:'POST',headers:H,body:JSON.stringify({text:tgTxt})});
     const td=await tr.json();
     if(td.ok){setSP('sp3','ok');lg('ti-brand-telegram','var(--tg)','Telegram gesendet ✓');}
     else{setSP('sp3','fail');lg('ti-alert-triangle','var(--am)','Telegram: '+td.error);}
@@ -585,7 +586,7 @@ async function genDraft(){
   if(!analysis){alert('Bitte erst analysieren.');return}
   const ds=$('dst');ds.innerHTML='<span class="bdg binfo"><i class="ti ti-loader"></i> Generiere...</span>';$('m-bo').value='';
   try{
-    const cfg=await(await fetch('/config',{headers:hdr()})).json();
+    const cfg=await(await fetch('/config',{headers:H})).json();
     const rr=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',
       headers:{'Content-Type':'application/json','x-api-key':cfg.api_key||'','anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
       body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1200,messages:[{role:'user',content:`Verfasse professionelle deutsche Antwort der Sela Holding Berlin.\n\nBriefanalyse:\n${analysis}\n\nErste Zeile: "BETREFF: [Betreff]"\nDann vollständiger Brief ab "Sehr geehrte..." – sachlich, höflich.\nAbsender: ${cfg.sender_name||'Sela Holding Berlin'}`}]})});
@@ -607,7 +608,7 @@ async function execDec(){
   try{
     if(curD==='wv'){
       const d=$('wv-d').value,p=$('wv-p').value,n=$('wv-n').value;
-      await fetch('/telegram/send',{method:'POST',headers:hdr(),body:JSON.stringify({text:`📅 <b>Wiedervorlage</b>\nNr.: ${nr}\nDatum: ${d||'–'}\nPriorität: ${p}\nNotiz: ${n||'–'}`})});
+      await fetch('/telegram/send',{method:'POST',headers:H,body:JSON.stringify({text:`📅 <b>Wiedervorlage</b>\nNr.: ${nr}\nDatum: ${d||'–'}\nPriorität: ${p}\nNotiz: ${n||'–'}`})});
       lg('ti-calendar-event','var(--gr)',`Wiedervorlage: ${d} · ${p} ✓`);
       showDone('Wiedervorlage eingetragen · Telegram ✓');
 
@@ -617,16 +618,16 @@ async function execDec(){
       const bo=$('m-bo').value.trim();
       if(!to){alert('Empfänger-E-Mail eingeben!');btn.disabled=false;btn.innerHTML='<i class="ti ti-check"></i> Ausführen';return}
       if(!bo){alert('E-Mail-Text eingeben!');btn.disabled=false;btn.innerHTML='<i class="ti ti-check"></i> Ausführen';return}
-      const er=await fetch('/email/send',{method:'POST',headers:hdr(),
+      const er=await fetch('/email/send',{method:'POST',headers:H,
         body:JSON.stringify({to,cc,subject:su,body:bo,pdf_b64:stPdfB64,pdf_name:`Posteingang_${nr}.pdf`})});
       const ed=await er.json();
       if(!ed.ok)throw new Error(ed.error);
-      await fetch('/telegram/send',{method:'POST',headers:hdr(),body:JSON.stringify({text:`✉️ <b>E-Mail gesendet</b>\nNr.: ${nr}\nAn: ${to}\nBetreff: ${su}`})});
+      await fetch('/telegram/send',{method:'POST',headers:H,body:JSON.stringify({text:`✉️ <b>E-Mail gesendet</b>\nNr.: ${nr}\nAn: ${to}\nBetreff: ${su}`})});
       lg('ti-mail','var(--gr)',`E-Mail gesendet an ${to} ✓`);
       showDone(`E-Mail gesendet an ${to} · Telegram ✓`);
 
     }else if(curD==='ab'){
-      await fetch('/telegram/send',{method:'POST',headers:hdr(),body:JSON.stringify({text:`📁 <b>Abgelegt</b>\nNr.: ${nr}\n${datum}`})});
+      await fetch('/telegram/send',{method:'POST',headers:H,body:JSON.stringify({text:`📁 <b>Abgelegt</b>\nNr.: ${nr}\n${datum}`})});
       lg('ti-folder-check','var(--gr)','Abgelegt · Telegram ✓');
       showDone('Abgelegt · Telegram ✓');
 
@@ -634,13 +635,13 @@ async function execDec(){
       const fto=$('fw-to').value.trim();
       if(!fto){alert('Empfänger eingeben!');btn.disabled=false;btn.innerHTML='<i class="ti ti-check"></i> Ausführen';return}
       const fn=$('fw-n').value.trim();
-      const cfg=await(await fetch('/config',{headers:hdr()})).json();
+      const cfg=await(await fetch('/config',{headers:H})).json();
       const fwb=`Weitergeleitet von Sela Holding Berlin\n\nHinweis: ${fn||'–'}\nEingangs-Nr.: ${nr} · ${datum}\n\n${analysis}\n\n--\n${cfg.sender_name||'Sela Holding Berlin'}`;
-      const er=await fetch('/email/send',{method:'POST',headers:hdr(),
+      const er=await fetch('/email/send',{method:'POST',headers:H,
         body:JSON.stringify({to:fto,subject:`Weiterleitung: Eingangspost ${nr}`,body:fwb,pdf_b64:stPdfB64,pdf_name:`Posteingang_${nr}.pdf`})});
       const ed=await er.json();
       if(!ed.ok)throw new Error(ed.error);
-      await fetch('/telegram/send',{method:'POST',headers:hdr(),body:JSON.stringify({text:`➡️ <b>Weitergeleitet</b>\nNr.: ${nr}\nAn: ${fto}`})});
+      await fetch('/telegram/send',{method:'POST',headers:H,body:JSON.stringify({text:`➡️ <b>Weitergeleitet</b>\nNr.: ${nr}\nAn: ${fto}`})});
       lg('ti-send','var(--gr)',`Weitergeleitet an ${fto} ✓`);
       showDone(`Weitergeleitet an ${fto} · Telegram ✓`);
     }
@@ -669,11 +670,8 @@ dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag')})
 dz.addEventListener('dragleave',()=>dz.classList.remove('drag'));
 dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag');addFiles(e.dataTransfer.files)});
 
-// Session prüfen
-fetch('/auth/check',{headers:{'X-Session':sess()}}).then(r=>r.json()).then(d=>{
-  if(!d.ok){window.location.href='/';}else{loadCfg();}
-});
-lg('ti-rocket','var(--ac)',`Posteingang Cloud-Version · ${tod()}`);
+loadCfg();
+lg('ti-rocket','var(--ac)',`Posteingang Cloud · ${tod()}`);
 </script>
 </body>
 </html>"""
